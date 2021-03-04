@@ -1,0 +1,398 @@
+#include <vector>
+#include <list>
+#include <utility>
+#include <stdexcept>
+
+template<class KeyType, class ValueType, class Hash = std::hash<KeyType>>
+class HashMap {
+public:
+
+class iterator {
+private:
+    size_t cell_id = 0;
+    std::vector<std::list<std::pair<const KeyType, ValueType>>>* t;
+    std::pair<typename std::list<std::pair<const KeyType, ValueType>>::iterator, bool> ptr;
+
+public:
+    iterator() = default;
+
+    iterator& operator = (const iterator& other ) = default;
+
+    iterator(size_t _cell_id) {cell_id = _cell_id;}
+
+    iterator(std::vector<std::list<std::pair<const KeyType, ValueType>>>* _t,
+            size_t _cell_id, std::pair<typename std::list<std::pair<const KeyType, ValueType>>::iterator, bool> _ptr) {
+        cell_id = _cell_id;
+        t = _t;
+        ptr = _ptr;
+    }
+
+    std::pair<const KeyType, ValueType>& operator*() {
+        return *ptr.first;
+    }
+
+    typename std::list<std::pair<const KeyType, ValueType>>::iterator operator->() {
+        return ptr.first;
+    }
+
+    iterator& operator++() {
+        if ((*t)[cell_id].end() != ptr.first) {
+            ptr.first++;
+        }
+        if ((*t)[cell_id].end() == ptr.first) {
+            while (cell_id < t->size() && (*t)[cell_id].end() == ptr.first) {
+                cell_id += 1;
+                if (cell_id == t->size()) {
+                    break;
+                }
+                ptr.first = (*t)[cell_id].begin();
+            }
+            if (cell_id == t->size()) {
+                ptr.second = 0;
+            }
+        }
+        return *this;
+    }
+    const iterator operator++(int) {
+        iterator temp = *this;
+        operator++();
+        return temp;
+    }
+    bool operator==(iterator other) const {
+        if (cell_id == other.cell_id && ((ptr.second == 0 && other.ptr.second == 0) || (ptr.first == other.ptr.first))) return true;
+        return false;
+    }
+    bool operator !=(iterator other) const {
+        return !(*this == other);
+    }
+    size_t get_cell() const {
+        return cell_id;
+    }
+};
+
+
+class const_iterator {
+private:
+    size_t cell_id = 0;
+    const std::vector<std::list<std::pair<const KeyType, ValueType>>>* t;
+    std::pair<typename std::list<std::pair<const KeyType, ValueType>>::const_iterator, bool> ptr;
+
+public:
+    const_iterator() = default;
+
+    const_iterator& operator = (const const_iterator& other ) = default;
+
+    const_iterator(size_t _cell_id) {cell_id = _cell_id;}
+
+    const_iterator(const std::vector<std::list<std::pair<const KeyType, ValueType>>>* _t,
+            size_t _cell_id, std::pair<typename std::list<std::pair<const KeyType, ValueType>>::const_iterator, bool> _ptr) {
+        cell_id = _cell_id;
+        t = _t;
+        ptr = _ptr;
+    }
+
+    const std::pair<const KeyType, ValueType>& operator*() const {
+        return *ptr.first;
+    }
+
+    const typename std::list<std::pair<const KeyType, ValueType>>::const_iterator operator->() {
+        return ptr.first;
+    }
+
+    const_iterator& operator++() {
+        if ((*t)[cell_id].end() != ptr.first) {
+            ptr.first++;
+        }
+        if ((*t)[cell_id].end() == ptr.first) {
+            while (cell_id < t->size() && (*t)[cell_id].end() == ptr.first) {
+                cell_id += 1;
+                if (cell_id == t->size()) {
+                    break;
+                }
+                ptr.first = (*t)[cell_id].begin();
+            }
+            if (cell_id == t->size()) {
+                ptr.second = 0;
+            }
+        }
+        return *this;
+    }
+    const const_iterator operator++(int) {
+        const_iterator temp = *this;
+        operator++();
+        return temp;
+    }
+    bool operator==(const_iterator other) const {
+        if (cell_id == other.cell_id && ((ptr.second == 0 && other.ptr.second == 0) || (ptr.first == other.ptr.first))) return true;
+        return false;
+    }
+    bool operator !=(const_iterator other)const {
+        return !(*this == other);
+    }
+    size_t get_cell() const {
+        return cell_id;
+    }
+};
+
+    HashMap(Hash h = Hash()) : hasher(h) {};
+
+    template<class Iter>
+    HashMap(Iter f, Iter l, Hash h = Hash()) : hasher(h){
+        while (f != l) {
+            operator[](f->first) = f->second;
+            ++f;
+        }
+    }
+
+    HashMap(const std::initializer_list<std::pair<KeyType, ValueType>> &l, Hash h = Hash()) : hasher(h) {
+        for (auto& elem : l) {
+            operator[](elem.first) = elem.second;
+        }
+    }
+
+    bool operator==(const HashMap& other) const {
+        if (first == other.first && last == other.last &&
+            const_first == other.const_first && const_last == other.const_last &&
+            cnt == other.cnt && table == other.table) return true;
+        return false;
+    }
+
+    HashMap& operator=(const HashMap& other) {
+        if (!(*this == other)) {
+            clear();
+            first = other.first;
+            last = other.last;
+            const_first = other.const_first;
+            const_last = other.const_last;
+            hasher = other.hasher;
+            cnt = other.cnt;
+            table.resize(other.table.size());
+            for (size_t i = 0; i < other.table.size(); ++i) {
+                for (auto p : other.table[i]) {
+                    table[i].push_back(p);
+                }
+            }
+        }
+        hasher = other.hasher;
+        return *this;
+    };
+
+    iterator begin() {
+        return first;
+    }
+
+    iterator end() {
+        return last;
+    }
+
+    const_iterator begin() const {
+        return const_first;
+    }
+
+    const_iterator end() const {
+        return const_last;
+    }
+
+    size_t size() const {
+        return cnt;
+    }
+
+    bool empty() const {
+        return cnt == 0;
+    }
+
+    Hash hash_function() const {
+        return hasher;
+    }
+
+    void clear() {
+        cnt = 0;
+        table.clear();
+        first = iterator(0), last = iterator(0);
+        const_first = const_iterator(0), const_last = const_iterator(0);
+    }
+
+    iterator find(const KeyType& key) {
+        if (table.size()) {
+            size_t idx = hasher(key);
+            idx %= table.size();
+
+            for (auto it = table[idx].begin(); it != table[idx].end(); ++it) {
+                if (it->first == key) {
+                    return iterator(&table, idx, {it, 1});
+                }
+            }
+        }
+        return end();
+    }
+
+    const const_iterator find(KeyType key) const {
+        if (table.size()) {
+            size_t idx = hasher(key);
+            idx %= table.size();
+
+            for (auto it = table[idx].begin(); it != table[idx].end(); ++it) {
+                if (it->first == key) {
+                    return const_iterator(&table, idx, {it, 1});
+                }
+            }
+        }
+        return end();
+    }
+
+    void update(int type) {
+        if (type == 0) {
+            if (table.size() == 0) {
+                table.resize(1);
+            }
+        } else if (type == 1) {
+            ++cnt;
+            if (cnt > table.size() / 4) {
+                size_t nsz = table.size() * 4;
+                std::vector<std::pair<KeyType, ValueType>> to_add;
+                for (auto& lists : table) {
+                    for (auto& p : lists) {
+                        to_add.push_back(p);
+                    }
+                }
+                table.clear();
+                table.resize(nsz);
+                size_t mn = table.size();
+                for (auto& p : to_add) {
+                    size_t idx = hasher(p.first);
+                    idx %= table.size();
+                    table[idx].push_back(p);
+                    if (idx < mn) {
+                        mn = idx;
+                    }
+                }
+                if (mn == table.size()) {
+                    first = iterator(&table, mn, {{}, 0});
+                    const_first = const_iterator(&table, mn, {{}, 0});
+                } else {
+                    first = iterator(&table, mn, {table[mn].begin(), 1});
+                    const_first = const_iterator(&table, mn, {table[mn].begin(), 1});
+                }
+            }
+        } else if (type == 2) {
+            --cnt;
+            if (cnt < table.size() / 16) {
+                size_t nsz = table.size() / 4;
+                std::vector<std::pair<KeyType, ValueType>> to_add;
+                for (auto& lists : table) {
+                    for (auto& p : lists) {
+                        to_add.push_back(p);
+                    }
+                }
+                table.clear();
+                table.resize(nsz);
+                size_t mn = table.size();
+                for (auto& p : to_add) {
+                    size_t idx = hasher(p.first);
+                    idx %= table.size();
+                    table[idx].push_back(p);
+                    if (idx < mn) {
+                        mn = idx;
+                    }
+                }
+                if (mn == table.size()) {
+                    first = iterator(&table, mn, {{}, 0});
+                    const_first = const_iterator(&table, mn, {{}, 0});
+                } else {
+                    first = iterator(&table, mn, {table[mn].begin(), 1});
+                    const_first = const_iterator(&table, mn, {table[mn].begin(), 1});
+                }
+            }
+        }
+        last = iterator(table.size());
+        const_last = const_iterator(table.size());
+    }
+
+    void insert(const std::pair<const KeyType, ValueType>& p) {
+        update(0);
+        size_t idx = hasher(p.first);
+        idx %= table.size();
+        bool have = false;
+        for (auto& x : table[idx]) {
+            if (x.first == p.first) {
+                have = true;
+                break;
+            }
+        }
+        if (!have) {
+            operator[](p.first) = p.second;
+        }
+    }
+
+    void erase(const KeyType& key) {
+        if (table.size() == 0) return;
+        size_t idx = hasher(key);
+        idx %= table.size();
+        bool have = false;
+        for (auto& x : table[idx]) {
+            if (x.first == key) {
+                have = true;
+                break;
+            }
+        }
+        if (have) {
+            if (cnt == 1) {
+                clear();
+                return;
+            }
+            for (auto it = table[idx].begin(); it != table[idx].end(); ++it) {
+                if (it->first == key) {
+                    if (it->first == first->first) {
+                        ++first;
+                        ++const_first;
+                    }
+                    table[idx].erase(it);
+                    break;
+                }
+            }
+            update(2);
+        }
+    }
+
+    const ValueType& at(const KeyType& key) const {
+        if (table.size() == 0) {
+            throw std::out_of_range("Bad");
+        }
+        size_t idx = hasher(key);
+        idx %= table.size();
+        for (auto& p : table[idx]) {
+            if (p.first == key) {
+                return p.second;
+            }
+        }
+        throw std::out_of_range("Bad");
+    }
+
+    ValueType& operator[](const KeyType& key) {
+        update(0);
+        size_t idx = hasher(key);
+        idx %= table.size();
+        for (auto& p : table[idx]) {
+            if (p.first == key) {
+                return p.second;
+            }
+        }
+        update(1);
+        idx = hasher(key);
+        idx %= table.size();
+        table[idx].push_back({key, ValueType()});
+        if (cnt == 1 || first.get_cell() >= idx) {
+            first = iterator(&table, idx, {table[idx].begin(), 1});
+            const_first = const_iterator(&table, idx, {table[idx].begin(), 1});
+        }
+        update(0);
+        return table[idx].back().second;
+    }
+
+private:
+    iterator first = iterator(0), last = iterator(0);
+    const_iterator const_first = const_iterator(0), const_last = const_iterator(0);
+    Hash hasher;
+    size_t cnt = 0;
+    std::vector<std::list<std::pair<const KeyType, ValueType>>> table;
+};
